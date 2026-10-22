@@ -1,6 +1,11 @@
 import assets from 'virtual:assets';
 import {prepareFiles,seal,unseal,sha,unb64,isMatchingPayment} from './billing.mjs';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
+const adminCookie='bordai_admin';
+const hex=bytes=>Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+async function passwordMatches(password,stored){if(typeof password!=='string'||password.length<12||password.length>256||!stored)return false;const parts=stored.split(':');if(parts.length!==2||!/^[a-f0-9]{32}$/.test(parts[0])||!/^[a-f0-9]{64}$/.test(parts[1]))return false;const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:Uint8Array.from(parts[0].match(/../g),v=>parseInt(v,16)),iterations:210000,hash:'SHA-256'},key,256);const actual=new Uint8Array(bits),expected=Uint8Array.from(parts[1].match(/../g),v=>parseInt(v,16));let diff=0;for(let i=0;i<32;i++)diff|=actual[i]^expected[i];return diff===0;}
+async function isAdmin(request,env){if(!env.ADMIN_PASSWORD_HASH||!env.CHECKOUT_SECRET)return false;const value=(request.headers.get('cookie')||'').split(';').map(v=>v.trim()).find(v=>v.startsWith(adminCookie+'='))?.slice(adminCookie.length+1);if(!value)return false;try{const session=await unseal(value,env.CHECKOUT_SECRET);return session.kind==='admin'&&session.exp>Date.now()}catch{return false}}
+const adminSessionHeaders=token=>({'Set-Cookie':adminCookie+'='+token+'; HttpOnly; Secure; SameSite=Strict; Path=/api/pix; Max-Age=28800','Cache-Control':'no-store'});
 const enabled=env=>!!(env.CHECKOUT_SECRET&&env.ASAAS_API_KEY&&env.ASAAS_PIX_KEY&&env.PIX_LIVE_ENABLED==='true');
 async function body(request){if(Number(request.headers.get('Content-Length'))>8000000)throw Error('Arquivo muito grande para o checkout.');const raw=await request.text();if(raw.length>8000000)throw Error('Arquivo muito grande para o checkout.');return JSON.parse(raw)}
 async function asaas(env,path,options={}){if(!enabled(env))throw Error('Recebimentos Pix ainda não foram ativados pelo responsável pelo site.');const response=await fetch('https://api.asaas.com/v3'+path,{...options,headers:{'Content-Type':'application/json',access_token:env.ASAAS_API_KEY,'User-Agent':'BordAI-Atelier/1.0'},signal:AbortSignal.timeout(12000)});if(!response.ok)throw Error('Não foi possível consultar o Pix. Tente novamente; nenhum arquivo foi liberado.');return response.json()}
@@ -12,6 +17,20 @@ export async function handle(request,env){const url=new URL(request.url),path=ur
   if(request.headers.get('Origin')!==url.origin)return json({error:'Origem não permitida.'},403);
   try{
    const input=await body(request);
+   if(path==='/api/pix/admin/login'){
+    if(!env.ADMIN_PASSWORD_HASH||!env.CHECKOUT_SECRET)return json({error:'Acesso administrativo ainda não configurado.'},503);
+    if(!await passwordMatches(input.password,env.ADMIN_PASSWORD_HASH))return json({error:'Senha incorreta.'},401);
+    const token=await seal({kind:'admin',exp:Date.now()+8*3600000},env.CHECKOUT_SECRET);
+    return new Response(JSON.stringify({authenticated:true}),{status:200,headers:{'Content-Type':'application/json','Cache-Control':'no-store',...adminSessionHeaders(token)}});
+   }
+   if(path==='/api/pix/admin/status')return json({authenticated:await isAdmin(request,env)});
+   if(path==='/api/pix/admin/logout')return new Response(JSON.stringify({authenticated:false}),{headers:{'Content-Type':'application/json','Set-Cookie':adminCookie+'=; HttpOnly; Secure; SameSite=Strict; Path=/api/pix; Max-Age=0','Cache-Control':'no-store'}});
+   if(path==='/api/pix/admin/download'){
+    if(!await isAdmin(request,env))return json({error:'Acesso administrativo não autorizado.'},401);
+    const quote=await unseal(input.quoteToken,env.CHECKOUT_SECRET);if(quote.kind!=='quote')throw Error('Cotação inválida.');
+    if(!['pes','dst'].includes(input.format))throw Error('Formato inválido.');
+    return new Response(unb64(quote.files[input.format]),{headers:{'Content-Type':'application/octet-stream','Content-Disposition':`attachment; filename="${quote.name.replace(/[^A-Za-z0-9_-]/g,'_')}.${input.format}"`,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
+   }
    if(path==='/api/pix/quote'){
     if(!env.CHECKOUT_SECRET)return json({error:'Checkout em configuração. Nenhum pagamento está disponível.'},503);
     const data=prepareFiles(input),id=crypto.randomUUID(),hash=await sha(new TextEncoder().encode(JSON.stringify(data.identity)));delete data.identity;const quote={v:1,kind:'quote',id,hash,...data,exp:Date.now()+15*60000};
