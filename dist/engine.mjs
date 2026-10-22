@@ -50,7 +50,12 @@ export function compile(document){
     while(pending.length){let at=0,best=Infinity;if(document.optimize!==false)for(let i=0;i<pending.length;i++){const d=Math.min(distance(cursor,pending[i][0]),distance(cursor,pending[i][1]));if(d<best){best=d;at=i;}}if(document.smartTravel&&document.optimize!==false&&pending.length>1){let continuous=-1,cost=Math.min(3,best+2.5);for(let i=0;i<pending.length;i++){const pair=pending[i],a=distance(cursor,pair[0]),b=distance(cursor,pair[1]),q=a<=b?pair[0]:pair[1],d=Math.min(a,b);if(d<cost&&safe(cursor,q)){continuous=i;cost=d;}}if(continuous>=0)at=continuous;}
     const pair=pending.splice(at,1)[0];if(distance(cursor,pair[1])<distance(cursor,pair[0]))pair.reverse();go(pair[0],role);stitch(pair[1],o.length||2.8,role);}
    };
-   if(o.underlay!==false)fill((o.angle??45)+90,2,'underlay');fill(o.angle??45,o.spacing||.4,'cover');
+   // Premium fills: do not add a full crossing underlay on every small raster fragment.
+   // Dense cross-underlay can double stitch count and make logos thick and rigid.
+   const boundsArea=(objectBounds(o)?.maxX-objectBounds(o)?.minX)*(objectBounds(o)?.maxY-objectBounds(o)?.minY);
+   const underlayArea=Number.isFinite(o.area)?o.area:boundsArea;
+   if(o.underlay!==false&&(!o.raster||underlayArea>=35))fill((o.angle??45)+90,Math.max(2.5,(o.spacing||.4)*7),'underlay');
+   fill(o.angle??45,o.spacing||.4,'cover');
   }
   if(metrics.stitches===before)issue(o,'empty','Objeto sem pontos. Confira a geometria e a largura.',origin,'error');
   const bounds=objectBounds(o);if(bounds&&(bounds.maxX-bounds.minX<1||bounds.maxY-bounds.minY<1))issue(o,'small','Detalhe pequeno: confira a escala e a cobertura.',origin);
