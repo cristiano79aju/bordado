@@ -7,7 +7,8 @@ export default async function pix(request) {
     CHECKOUT_SECRET:process.env.CHECKOUT_SECRET,
     ASAAS_API_KEY:process.env.ASAAS_API_KEY,
     ASAAS_PIX_KEY:process.env.ASAAS_PIX_KEY,
-    PIX_LIVE_ENABLED:process.env.PIX_LIVE_ENABLED
+    PIX_LIVE_ENABLED:process.env.PIX_LIVE_ENABLED,
+    ADMIN_PASSWORD_HASH:process.env.ADMIN_PASSWORD_HASH
   });
 }
 export const config = {path:'/api/pix/*'};
