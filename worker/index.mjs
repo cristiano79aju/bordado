@@ -23,12 +23,12 @@ export async function handle(request,env){const url=new URL(request.url),path=ur
    if(path==='/api/card/status'||path==='/api/card/download'){
     if(env.ASAAS_CARD_ENABLED!=='true')return json({error:'Cartão indisponível.'},503);
     const a=await unseal(input.accessToken,env.CHECKOUT_SECRET);
-    if(a.kind!=='card-order')throw Error('Pedido inválido.');
+    if(a.kind!=='card-order'||!a.checkoutId||!a.id||!a.files?.pes||!a.files?.dst||!Number.isSafeInteger(a.cardAmount)||a.exp<Date.now())throw Error('Pedido inválido ou expirado.');
     const base=env.ASAAS_CARD_MODE==='sandbox'?'https://api-sandbox.asaas.com':'https://api.asaas.com';
     const res=await fetch(base+'/v3/payments?checkoutSession='+encodeURIComponent(a.checkoutId),{headers:{access_token:env.ASAAS_API_KEY,'User-Agent':'BordAI/1.0'}});
     if(!res.ok)throw Error('Falha ao consultar pagamento.');
     const data=await res.json();
-    const paid=Array.isArray(data.data)&&data.data.some(p=>p.checkoutSession===a.checkoutId&&p.externalReference===a.id&&p.billingType==='CREDIT_CARD'&&['CONFIRMED','RECEIVED'].includes(p.status)&&Math.round(p.value*100)===a.cardAmount);
+    const paid=Array.isArray(data.data)&&data.data.some(p=>p.checkoutSession===a.checkoutId&&p.billingType==='CREDIT_CARD'&&['CONFIRMED','RECEIVED'].includes(p.status)&&Math.round(p.value*100)===a.cardAmount);
     if(path.endsWith('/status'))return json({paid,hash:a.hash});
     if(!paid)return json({error:'Pagamento não confirmado.'},402);
     if(!['pes','dst'].includes(input.format))throw Error('Formato inválido.');
@@ -37,7 +37,7 @@ export async function handle(request,env){const url=new URL(request.url),path=ur
    if(path==='/api/card/create'){
     if(env.ASAAS_CARD_ENABLED!=='true'||!env.ASAAS_API_KEY)return json({error:'Cartão ainda não habilitado.'},503);
     const quote=await unseal(input.quoteToken,env.CHECKOUT_SECRET);
-    if(quote.kind!=='quote'||!quote.files?.pes||!quote.files?.dst)throw Error('Cotação inválida.');
+    if(quote.kind!=='quote'||!quote.files?.pes||!quote.files?.dst||quote.exp<Date.now()||!Number.isSafeInteger(quote.stitches)||quote.stitches<1)throw Error('Cotação inválida ou expirada.');
     const amount=Math.ceil(quote.stitches/1000)*(Number(env.ASAAS_CARD_BRL_CENTS_PER_1000)||500);
     if(!Number.isSafeInteger(amount)||amount<500)throw Error('Valor inválido.');
     const response=await fetch((env.ASAAS_CARD_MODE==='sandbox'?'https://api-sandbox.asaas.com':'https://api.asaas.com')+'/v3/checkouts',{method:'POST',headers:{'Content-Type':'application/json','access_token':env.ASAAS_API_KEY,'User-Agent':'BordAI/1.0'},body:JSON.stringify({billingTypes:['CREDIT_CARD'],chargeTypes:['DETACHED'],minutesToExpire:60,externalReference:quote.id,callback:{successUrl:url.origin+'/',cancelUrl:url.origin+'/',expiredUrl:url.origin+'/'},items:[{name:'Matriz BordAI',description:quote.stitches+' pontos',quantity:1,value:amount/100}]})});
