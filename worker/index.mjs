@@ -1,3 +1,4 @@
+import {paypal} from './paypal.mjs';
 import assets from 'virtual:assets';
 import {prepareFiles,seal,unseal,sha,unb64,isMatchingPayment} from './billing.mjs';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
@@ -11,12 +12,14 @@ async function body(request){if(Number(request.headers.get('Content-Length'))>80
 async function asaas(env,path,options={}){if(!enabled(env))throw Error('Recebimentos Pix ainda não foram ativados pelo responsável pelo site.');const response=await fetch('https://api.asaas.com/v3'+path,{...options,headers:{'Content-Type':'application/json',access_token:env.ASAAS_API_KEY,'User-Agent':'BordAI-Atelier/1.0'},signal:AbortSignal.timeout(12000)});if(!response.ok)throw Error('Não foi possível consultar o Pix. Tente novamente; nenhum arquivo foi liberado.');return response.json()}
 async function paymentStatus(env,order){const response=await asaas(env,'/payments?limit=100&pixQrCodeId='+encodeURIComponent(order.qrId));return Array.isArray(response.data)&&response.data.some(p=>isMatchingPayment(p,order));}
 export async function handle(request,env){const url=new URL(request.url),path=url.pathname;
+ if(path==='/api/paypal/config'&&request.method==='GET')return paypal(path,{},env,url.origin);
  if(path==='/api/pix/config'&&request.method==='GET')return json({enabled:enabled(env),rateCents:100,perStitches:1000,rounding:'up',accountRequired:false});
  if(path.startsWith('/api/')){
   if(request.method!=='POST')return json({error:'Método não permitido.'},405);
   if(request.headers.get('Origin')!==url.origin)return json({error:'Origem não permitida.'},403);
   try{
    const input=await body(request);
+   if(path.startsWith('/api/paypal/'))return paypal(path,input,env,url.origin);
    if(path==='/api/pix/admin/login'){
     if(!env.ADMIN_PASSWORD_HASH||!env.CHECKOUT_SECRET)return json({error:'Acesso administrativo ainda não configurado.'},503);
     if(input.email!=='cristiano.se.adm@gmail.com'||!await passwordMatches(input.password,env.ADMIN_PASSWORD_HASH))return json({error:'Senha incorreta.'},401);
