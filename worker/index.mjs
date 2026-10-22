@@ -20,7 +20,7 @@ export async function handle(request,env){const url=new URL(request.url),path=ur
    if(path==='/api/pix/admin/login'){
     if(!env.ADMIN_PASSWORD_HASH||!env.CHECKOUT_SECRET)return json({error:'Acesso administrativo ainda não configurado.'},503);
     if(input.email!=='cristiano.se.adm@gmail.com'||!await passwordMatches(input.password,env.ADMIN_PASSWORD_HASH))return json({error:'Senha incorreta.'},401);
-    const token=await seal({kind:'admin',exp:Date.now()+8*3600000},env.CHECKOUT_SECRET);
+    const token=await seal({v:1,kind:'admin',stitches:1,amount:100,exp:Date.now()+8*3600000},env.CHECKOUT_SECRET);
     return new Response(JSON.stringify({authenticated:true}),{status:200,headers:{'Content-Type':'application/json','Cache-Control':'no-store',...adminSessionHeaders(token)}});
    }
    if(path==='/api/pix/admin/status')return json({authenticated:await isAdmin(request,env)});
