@@ -12,6 +12,18 @@ async function body(request){if(Number(request.headers.get('Content-Length'))>80
 async function asaas(env,path,options={}){if(!enabled(env))throw Error('Recebimentos Pix ainda não foram ativados pelo responsável pelo site.');const response=await fetch('https://api.asaas.com/v3'+path,{...options,headers:{'Content-Type':'application/json',access_token:env.ASAAS_API_KEY,'User-Agent':'BordAI-Atelier/1.0'},signal:AbortSignal.timeout(12000)});if(!response.ok)throw Error('Não foi possível consultar o Pix. Tente novamente; nenhum arquivo foi liberado.');return response.json()}
 async function paymentStatus(env,order){const response=await asaas(env,'/payments?limit=100&pixQrCodeId='+encodeURIComponent(order.qrId));return Array.isArray(response.data)&&response.data.some(p=>isMatchingPayment(p,order));}
 export async function handle(request,env){const url=new URL(request.url),path=url.pathname;
+ if(path==='/api/card/webhook'&&request.method==='POST'){
+  if(!env.ASAAS_WEBHOOK_TOKEN)return json({error:'Webhook não configurado.'},503);
+  const provided=request.headers.get('asaas-access-token')||'';
+  const expected=env.ASAAS_WEBHOOK_TOKEN;
+  const x=new TextEncoder().encode(provided),y=new TextEncoder().encode(expected);
+  if(x.length!==y.length||x.length<32)return json({error:'Não autorizado.'},401);
+  let diff=0;for(let i=0;i<x.length;i++)diff|=x[i]^y[i];
+  if(diff)return json({error:'Não autorizado.'},401);
+  let event;try{event=await body(request)}catch{return json({error:'Evento inválido.'},400)}
+  if(!event?.id||!['CHECKOUT_CREATED','CHECKOUT_PAID','CHECKOUT_CANCELED','CHECKOUT_EXPIRED'].includes(event.event)||!event.checkout?.id)return json({error:'Evento inválido.'},400);
+  return json({received:true});
+ }
  if(path==='/api/paypal/config'&&request.method==='GET')return paypal(path,{},env,url.origin);
  if(path==='/api/card/config'&&request.method==='GET')return json({enabled:env.ASAAS_CARD_ENABLED==='true'&&!!env.ASAAS_API_KEY,rateCents:Number(env.ASAAS_CARD_BRL_CENTS_PER_1000)||500,currency:'BRL'});
  if(path==='/api/pix/config'&&request.method==='GET')return json({enabled:enabled(env),rateCents:100,perStitches:1000,rounding:'up',accountRequired:false});
