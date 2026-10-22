@@ -1,0 +1,18 @@
+const translations = new Map(Object.entries({
+'ESTÚDIO DE BORDADO':'EMBROIDERY STUDIO','Novo projeto':'New project','Salvar':'Save','Exportar matriz':'Export design','Mover':'Move','Texto':'Text','Área':'Area','Nós':'Nodes','Revisão':'Review','Projetos':'Projects','Importar':'Import','Objetos':'Objects','Criar':'Create','Seu desenho.':'Your design.','Seus próximos pontos.':'Your next stitches.','Duplicar':'Duplicate','Excluir':'Delete','Organizar por cor':'Organize by color','Otimizar produção e comparar':'Optimize production and compare','Importar arte ou matriz':'Import artwork or design','Nome do projeto':'Project name','Fechar':'Close','Entrar':'Sign in','Sair':'Sign out','Acesso do proprietário':'Owner access','E-mail do administrador':'Administrator email','Senha de administrador':'Administrator password','Pagamento Pix temporariamente indisponível. Nenhuma cobrança será gerada.':'Pix payment temporarily unavailable. No charge will be created.','Pontos':'Stitches','Cores':'Colors','Cortes':'Trims','Saltos':'Jumps','Cancelar':'Cancel','Confirmar':'Confirmar','Novo':'New','Aplicar':'Apply','Baixar':'Download','Pagamento':'Payment','Preço':'Price','Máquina':'Machine','Tecido / entretela':'Fabric / stabilizer','Resultado informado':'Reported result','Salvar resultado desta versão':'Save result for this version','Foto da amostra':'Sample photo','Observações':'Notes','Amostras na máquina':'Machine samples'
+}));
+const originals=new WeakMap();
+let locale=localStorage.getItem('bordai-language')==='en'?'en':'pt';
+const skip=node=>node.parentElement?.closest('script,style,textarea,option[data-no-translate],code,pre,[contenteditable="true"]');
+function translate(root=document.body){
+ const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+ const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
+ for(const node of nodes){if(skip(node))continue;const raw=originals.get(node)??node.nodeValue;const trimmed=raw.trim();if(!trimmed||!translations.has(trimmed))continue;originals.set(node,raw);const translated=locale==='en'?translations.get(trimmed):raw;const leading=raw.match(/^\s*/)[0],trailing=raw.match(/\s*$/)[0];const value=locale==='en'?leading+translated+trailing:raw;if(node.nodeValue!==value)node.nodeValue=value;}
+ for(const el of root.querySelectorAll('[placeholder],[title],[aria-label]'))for(const attr of ['placeholder','title','aria-label']){if(!el.hasAttribute(attr))continue;const key='original'+attr;const original=el.dataset[key]??el.getAttribute(attr);if(!el.dataset[key])el.dataset[key]=original;const val=locale==='en'?(translations.get(original)||original):original;if(el.getAttribute(attr)!==val)el.setAttribute(attr,val);}
+ document.documentElement.lang=locale==='en'?'en':'pt-BR';
+ const button=document.getElementById('languageSwitch');if(button)button.value=locale;
+}
+const switcher=document.createElement('select');switcher.id='languageSwitch';switcher.setAttribute('aria-label','Idioma / Language');switcher.style.cssText='margin:0 8px;padding:8px;border:1px solid #aab3c7;border-radius:8px;background:#fff;color:#172039;font-weight:600';switcher.innerHTML='<option value="pt">🇧🇷 Português</option><option value="en">🇺🇸 English</option>';switcher.value=locale;
+(document.querySelector('.top-actions')||document.querySelector('header')||document.body).prepend(switcher);
+switcher.addEventListener('change',()=>{locale=switcher.value;localStorage.setItem('bordai-language',locale);translate();});
+let pending=false;const observer=new MutationObserver(()=>{if(pending)return;pending=true;queueMicrotask(()=>{pending=false;translate();});});observer.observe(document.body,{subtree:true,childList:true});translate();
