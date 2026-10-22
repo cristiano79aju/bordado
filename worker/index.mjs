@@ -13,12 +13,25 @@ async function asaas(env,path,options={}){if(!enabled(env))throw Error('Recebime
 async function paymentStatus(env,order){const response=await asaas(env,'/payments?limit=100&pixQrCodeId='+encodeURIComponent(order.qrId));return Array.isArray(response.data)&&response.data.some(p=>isMatchingPayment(p,order));}
 export async function handle(request,env){const url=new URL(request.url),path=url.pathname;
  if(path==='/api/paypal/config'&&request.method==='GET')return paypal(path,{},env,url.origin);
+ if(path==='/api/card/config'&&request.method==='GET')return json({enabled:env.ASAAS_CARD_ENABLED==='true'&&!!env.ASAAS_API_KEY,rateCents:Number(env.ASAAS_CARD_BRL_CENTS_PER_1000)||500,currency:'BRL'});
  if(path==='/api/pix/config'&&request.method==='GET')return json({enabled:enabled(env),rateCents:100,perStitches:1000,rounding:'up',accountRequired:false});
  if(path.startsWith('/api/')){
   if(request.method!=='POST')return json({error:'Método não permitido.'},405);
   if(request.headers.get('Origin')!==url.origin)return json({error:'Origem não permitida.'},403);
   try{
    const input=await body(request);
+   if(path==='/api/card/create'){
+    if(env.ASAAS_CARD_ENABLED!=='true'||!env.ASAAS_API_KEY)return json({error:'Cartão ainda não habilitado.'},503);
+    const quote=await unseal(input.quoteToken,env.CHECKOUT_SECRET);
+    if(quote.kind!=='quote'||!quote.files?.pes||!quote.files?.dst)throw Error('Cotação inválida.');
+    const amount=Math.ceil(quote.stitches/1000)*(Number(env.ASAAS_CARD_BRL_CENTS_PER_1000)||500);
+    if(!Number.isSafeInteger(amount)||amount<500)throw Error('Valor inválido.');
+    const response=await fetch((env.ASAAS_CARD_MODE==='sandbox'?'https://api-sandbox.asaas.com':'https://api.asaas.com')+'/v3/checkouts',{method:'POST',headers:{'Content-Type':'application/json','access_token':env.ASAAS_API_KEY,'User-Agent':'BordAI/1.0'},body:JSON.stringify({billingTypes:['CREDIT_CARD'],chargeTypes:['DETACHED'],minutesToExpire:60,externalReference:quote.id,callback:{successUrl:url.origin+'/',cancelUrl:url.origin+'/',expiredUrl:url.origin+'/'},items:[{name:'Matriz BordAI',description:quote.stitches+' pontos',quantity:1,value:amount/100}]})});
+    if(!response.ok)return json({error:'Asaas não conseguiu criar o checkout de cartão.'},502);
+    const checkout=await response.json();if(!/^[a-zA-Z0-9-]{10,100}$/.test(checkout.id||''))throw Error('Checkout inválido.');
+    const accessToken=await seal({...quote,kind:'card-order',checkoutId:checkout.id,cardAmount:amount,exp:Date.now()+30*86400000},env.CHECKOUT_SECRET);
+    return json({accessToken,checkoutUrl:'https://asaas.com/checkoutSession/show?id='+encodeURIComponent(checkout.id),amount});
+   }
    if(path.startsWith('/api/paypal/'))return paypal(path,input,env,url.origin);
    if(path==='/api/pix/admin/login'){
     if(!env.ADMIN_PASSWORD_HASH||!env.CHECKOUT_SECRET)return json({error:'Acesso administrativo ainda não configurado.'},503);
