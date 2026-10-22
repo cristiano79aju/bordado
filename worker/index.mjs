@@ -20,6 +20,20 @@ export async function handle(request,env){const url=new URL(request.url),path=ur
   if(request.headers.get('Origin')!==url.origin)return json({error:'Origem não permitida.'},403);
   try{
    const input=await body(request);
+   if(path==='/api/card/status'||path==='/api/card/download'){
+    if(env.ASAAS_CARD_ENABLED!=='true')return json({error:'Cartão indisponível.'},503);
+    const a=await unseal(input.accessToken,env.CHECKOUT_SECRET);
+    if(a.kind!=='card-order')throw Error('Pedido inválido.');
+    const base=env.ASAAS_CARD_MODE==='sandbox'?'https://api-sandbox.asaas.com':'https://api.asaas.com';
+    const res=await fetch(base+'/v3/payments?checkoutSession='+encodeURIComponent(a.checkoutId),{headers:{access_token:env.ASAAS_API_KEY,'User-Agent':'BordAI/1.0'}});
+    if(!res.ok)throw Error('Falha ao consultar pagamento.');
+    const data=await res.json();
+    const paid=Array.isArray(data.data)&&data.data.some(p=>p.checkoutSession===a.checkoutId&&p.externalReference===a.id&&p.billingType==='CREDIT_CARD'&&['CONFIRMED','RECEIVED'].includes(p.status)&&Math.round(p.value*100)===a.cardAmount);
+    if(path.endsWith('/status'))return json({paid,hash:a.hash});
+    if(!paid)return json({error:'Pagamento não confirmado.'},402);
+    if(!['pes','dst'].includes(input.format))throw Error('Formato inválido.');
+    return new Response(unb64(a.files[input.format]),{headers:{'Content-Type':'application/octet-stream','Content-Disposition':'attachment; filename="BordAI.'+input.format+'"','Cache-Control':'no-store'}});
+   }
    if(path==='/api/card/create'){
     if(env.ASAAS_CARD_ENABLED!=='true'||!env.ASAAS_API_KEY)return json({error:'Cartão ainda não habilitado.'},503);
     const quote=await unseal(input.quoteToken,env.CHECKOUT_SECRET);
