@@ -19,5 +19,14 @@ export function prepareRaster(rgba,w,h,{maxColors=6,removeWhite=true,mode='auto'
  if(delicate){for(let pass=0;pass<3;pass++){const previous=labels.slice();for(let y=0;y<h;y++)for(let x=0;x<w;x++){const at=y*w+x,current=previous[at];if(current<0)continue;const counts=new Uint8Array(palette.length);for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){const xx=x+dx,yy=y+dy;if(xx>=0&&xx<w&&yy>=0&&yy<h){const c=previous[yy*w+xx];if(c>=0)counts[c]++;}}let best=current;for(let c=0;c<counts.length;c++)if(counts[c]>counts[best])best=c;if(best!==current&&counts[best]>=10&&counts[current]<=6&&d2(palette[current],palette[best])<11000)labels[at]=best;}}}
  let mergedFragments=0;
  if(delicate||tonal){const seen=new Uint8Array(labels.length),unit=width/(maxX-minX+1),limit=delicate?Math.max(2,Math.floor(.5/(unit*unit))):2;for(let seed=0;seed<labels.length;seed++){if(seen[seed]||labels[seed]<0)continue;const color=labels[seed],queue=[seed],neighbors=new Uint32Array(palette.length);seen[seed]=1;for(let at=0;at<queue.length;at++){const i=queue[at],x=i%w,y=Math.floor(i/w);for(const j of [x?i-1:-1,x<w-1?i+1:-1,y?i-w:-1,y<h-1?i+w:-1])if(j>=0&&labels[j]>=0){if(labels[j]!==color)neighbors[labels[j]]++;else if(!seen[j]){seen[j]=1;queue.push(j)}}}if(queue.length>limit)continue;let best=-1;for(let c=0;c<neighbors.length;c++)if(neighbors[c]&&d2(palette[c],palette[color])<(delicate?11000:2000)&&(best<0||neighbors[c]>neighbors[best]))best=c;if(best>=0){for(const i of queue)labels[i]=best;mergedFragments++;}}}
- return {labels,mergedFragments,palette:palette.map(c=>c.map(v=>Math.round(v))),minX,maxX,minY,maxY,transparent};
+ // Gentle chroma recovery: palette averaging otherwise dulls vivid logos.
+ // Preserve neutral blacks, whites and grays; never push a channel outside sRGB.
+ const vividPalette=palette.map(rgb=>{
+  const hi=Math.max(...rgb),lo=Math.min(...rgb),chroma=hi-lo;
+  if(chroma<22)return rgb.map(v=>Math.round(v));
+  const center=rgb.reduce((a,b)=>a+b,0)/3;
+  const boost=1+Math.min(.14,.14*chroma/100);
+  return rgb.map(v=>Math.max(0,Math.min(255,Math.round(center+(v-center)*boost))));
+ });
+ return {labels,mergedFragments,palette:vividPalette,minX,maxX,minY,maxY,transparent};
 }
