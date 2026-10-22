@@ -3,7 +3,7 @@ import {prepareFiles,seal,unseal,sha,unb64,isMatchingPayment} from './billing.mj
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const adminCookie='bordai_admin';
 const hex=bytes=>Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
-async function passwordMatches(password,stored){if(typeof password!=='string'||password.length<12||password.length>256||!stored)return false;const parts=stored.split(':');if(parts.length!==2||!/^[a-f0-9]{32}$/.test(parts[0])||!/^[a-f0-9]{64}$/.test(parts[1]))return false;const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:Uint8Array.from(parts[0].match(/../g),v=>parseInt(v,16)),iterations:210000,hash:'SHA-256'},key,256);const actual=new Uint8Array(bits),expected=Uint8Array.from(parts[1].match(/../g),v=>parseInt(v,16));let diff=0;for(let i=0;i<32;i++)diff|=actual[i]^expected[i];return diff===0;}
+async function passwordMatches(password,stored){if(typeof password!=='string'||password.length<8||password.length>256||!stored)return false;const parts=stored.split(':');if(parts.length!==2||!/^[a-f0-9]{32}$/.test(parts[0])||!/^[a-f0-9]{64}$/.test(parts[1]))return false;const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:Uint8Array.from(parts[0].match(/../g),v=>parseInt(v,16)),iterations:210000,hash:'SHA-256'},key,256);const actual=new Uint8Array(bits),expected=Uint8Array.from(parts[1].match(/../g),v=>parseInt(v,16));let diff=0;for(let i=0;i<32;i++)diff|=actual[i]^expected[i];return diff===0;}
 async function isAdmin(request,env){if(!env.ADMIN_PASSWORD_HASH||!env.CHECKOUT_SECRET)return false;const value=(request.headers.get('cookie')||'').split(';').map(v=>v.trim()).find(v=>v.startsWith(adminCookie+'='))?.slice(adminCookie.length+1);if(!value)return false;try{const session=await unseal(value,env.CHECKOUT_SECRET);return session.kind==='admin'&&session.exp>Date.now()}catch{return false}}
 const adminSessionHeaders=token=>({'Set-Cookie':adminCookie+'='+token+'; HttpOnly; Secure; SameSite=Strict; Path=/api/pix; Max-Age=28800','Cache-Control':'no-store'});
 const enabled=env=>!!(env.CHECKOUT_SECRET&&env.ASAAS_API_KEY&&env.ASAAS_PIX_KEY&&env.PIX_LIVE_ENABLED==='true');
@@ -19,7 +19,7 @@ export async function handle(request,env){const url=new URL(request.url),path=ur
    const input=await body(request);
    if(path==='/api/pix/admin/login'){
     if(!env.ADMIN_PASSWORD_HASH||!env.CHECKOUT_SECRET)return json({error:'Acesso administrativo ainda não configurado.'},503);
-    if(!await passwordMatches(input.password,env.ADMIN_PASSWORD_HASH))return json({error:'Senha incorreta.'},401);
+    if(input.email!=='cristiano.se.adm@gmail.com'||!await passwordMatches(input.password,env.ADMIN_PASSWORD_HASH))return json({error:'Senha incorreta.'},401);
     const token=await seal({kind:'admin',exp:Date.now()+8*3600000},env.CHECKOUT_SECRET);
     return new Response(JSON.stringify({authenticated:true}),{status:200,headers:{'Content-Type':'application/json','Cache-Control':'no-store',...adminSessionHeaders(token)}});
    }
