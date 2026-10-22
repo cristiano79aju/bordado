@@ -1,0 +1,14 @@
+{
+  "name": "bordai-atelier-premium",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-payments.mjs",
+    "dev": "node scripts/dev.mjs",
+    "build:netlify": "node scripts/build-netlify.mjs",
+    "test:checkout": "node tests/pix.mjs && node tests/netlify.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}

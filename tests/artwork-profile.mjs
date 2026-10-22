@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {analyzeArtworkRaster,artworkComplexity} from '../dist/artwork-profile.mjs';
+const object=count=>({paths:[{points:Array.from({length:count},(_,x)=>({x,y:0}))}]});
+assert(!artworkComplexity([object(24000)]).needsDetail);
+assert(artworkComplexity([object(24001)]).needsDetail);
+assert(artworkComplexity([{paths:Array.from({length:4001},()=>({points:[{x:0,y:0}]}))}]).needsDetail);
+const w=60,h=40,rgba=new Uint8ClampedArray(w*h*4);for(let y=5;y<35;y++)for(let x=5;x<55;x++)rgba.set(x===29?[20,20,20,255]:[240,220,200,255],(y*w+x)*4);
+const before=rgba.slice(),o=analyzeArtworkRaster(rgba,w,h,{width:30,maxColors:4,mode:'delicate',adaptive:true,source:'test'});
+assert.deepEqual(rgba,before);assert(o.length);assert(o.every(o=>o.preparation.adaptive&&o.preparation.mode==='delicate'&&o.source==='test'));assert(o.every(o=>o.analysis.reason.includes('automaticamente')));assert(artworkComplexity(o).nodes<30000);
+console.log('Adaptive thresholds, source immutability and persistent preparation notices passed');

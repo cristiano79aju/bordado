@@ -1,0 +1,4 @@
+// Supervised local preview. No receiver key, provider key or live billing here.
+import http from 'node:http';import {randomBytes} from 'node:crypto';import worker from '../dist/server/index.js';
+const env={CHECKOUT_SECRET:randomBytes(32).toString('base64'),PIX_LIVE_ENABLED:'false'};
+http.createServer(async(req,res)=>{try{const parts=[];for await(const chunk of req)parts.push(chunk);const request=new Request(new URL(req.url,'http://terminal.local:4173'),{method:req.method,headers:req.headers,...(!['GET','HEAD'].includes(req.method)?{body:Buffer.concat(parts)}:{})}),response=await worker.fetch(request,env);res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()))}catch{res.writeHead(500);res.end('Preview indisponível')}}).listen(Number(process.env.PORT)||4173,'0.0.0.0',()=>console.log('BordAI supervised preview · Pix live disabled'));
