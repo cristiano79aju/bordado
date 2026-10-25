@@ -48,7 +48,7 @@ jobs:
         run: node tests/artwork-profile.mjs
 
       - name: Verify layer planner and dependency order
-        run: node tests/layers.mjs
+        run: npm run test:layers
 
       - name: Build Netlify application
         run: npm run build:netlify
