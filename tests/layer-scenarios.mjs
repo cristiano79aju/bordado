@@ -17,4 +17,4 @@ for(const fixture of cases){
  assert(plan.summary.layers>=2,fixture.name+' dynamic layers');
  console.log(fixture.name,JSON.stringify({layers:plan.summary.layers,objects:plan.summary.objects,colors:plan.summary.colors,dependencies:plan.dependencies.length,order:plan.order}));
 }
-console.log('Four synthetic layer archetypes passed. These are geometry fixtures, not the user's original image files.');
+console.log("Four synthetic layer archetypes passed. These are geometry fixtures, not the original image files.");
