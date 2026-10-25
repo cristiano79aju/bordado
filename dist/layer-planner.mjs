@@ -73,6 +73,18 @@ export function planLayers(input){
  }
  const names=new Map();
  for(const x of objects){const layer=layerOf.get(x.o.id)||1;if(!names.has(layer))names.set(layer,labelFor(layer));x.o.layerId=x.o.layerId||'layer-'+layer;x.o.layerIndex=layer;x.o.layerName=x.o.layerName||names.get(layer);x.o.layerLocked=!!x.o.layerLocked;x.o.visible=x.o.visible!==false;x.o.layerConfidence=background&&x===background?'high':'heuristic';}
+ const executionIndex=new Map(ordered.map((o,i)=>[o.id,i]));
+ for(const x of objects){
+  const o=x.o,layer=layerOf.get(o.id)||1,color=objectColor(o),b=x.b;
+  o.colorGroupId='color-'+color.replace('#','');
+  o.executionOrder=executionIndex.get(o.id)??x.index;
+  o.entryPoint=startpoint(o);o.exitPoint=endpoint(o);
+  o.stitchDensity=Number.isFinite(o.spacing)&&o.spacing>0?1/o.spacing:null;
+  o.overlapRelations=dependencies.filter(edge=>edge.before===o.id||edge.after===o.id).map(edge=>({objectId:edge.before===o.id?edge.after:edge.before,relation:edge.before===o.id?'underlies':'overlies',confidence:edge.confidence}));
+  o.occlusionStatus='unknown-from-flat-raster';
+  o.visibilityStatus=o.visible===false?'hidden-by-user':'visible-segmented-region';
+  o.layerMeta={id:o.layerId,index:layer,name:o.layerName,color,kind:o.kind,bounds:b,start:o.entryPoint,end:o.exitPoint,order:o.executionOrder,density:o.stitchDensity,dependencies:[...(o.layerDependencies||[])]};
+ }
  const layers=[...new Set(objects.map(x=>layerOf.get(x.o.id)||1))].sort((a,b)=>a-b).map(index=>({id:'layer-'+index,index,name:names.get(index)||labelFor(index),objectIds:objects.filter(x=>(layerOf.get(x.o.id)||1)===index).map(x=>x.o.id),visible:objects.filter(x=>(layerOf.get(x.o.id)||1)===index).every(x=>x.o.visible!==false),locked:objects.filter(x=>(layerOf.get(x.o.id)||1)===index).some(x=>x.o.layerLocked)}));
  return {objects:ordered,layers,dependencies,order:ordered.map(o=>o.id),summary:{layers:layers.length,objects:objects.length,colors:new Set(objects.map(x=>objectColor(x.o))).size,heuristicRelations:dependencies.filter(x=>x.confidence==='heuristic').length,background:background?.o.id||null,unbounded:input.length-objects.length}};
 }
