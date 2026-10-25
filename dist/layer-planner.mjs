@@ -17,7 +17,7 @@ function startpoint(o){const pts=o.kind==='machine'?(o.commands||[]).filter(p=>p
 function labelFor(index){return index===0?'BACKGROUND':index<=5?'CAMADA '+index:'CAMADA '+index;}
 export function planLayers(input){
  const objects=input.map((o,index)=>({o,index,b:bounds(o)})).filter(x=>x.b);
- if(!objects.length)return {objects:input,layers:[],dependencies:[],order:[],summary:{layers:0,objects:input.length,colors:0,heuristicRelations:0}};
+ if(!objects.length)return {objects:input,layers:[],dependencies:[],order:[],summary:{layers:0,objects:input.length,colors:0,heuristicRelations:0,unbounded:input.length}};
  const union={minX:Math.min(...objects.map(x=>x.b.minX)),minY:Math.min(...objects.map(x=>x.b.minY)),maxX:Math.max(...objects.map(x=>x.b.maxX)),maxY:Math.max(...objects.map(x=>x.b.maxY))};
  const totalArea=Math.max(1,area(union));
  const ranked=[...objects].sort((a,b)=>area(b.b)-area(a.b));
@@ -74,13 +74,13 @@ export function planLayers(input){
  const names=new Map();
  for(const x of objects){const layer=layerOf.get(x.o.id)||1;if(!names.has(layer))names.set(layer,labelFor(layer));x.o.layerId=x.o.layerId||'layer-'+layer;x.o.layerIndex=layer;x.o.layerName=x.o.layerName||names.get(layer);x.o.layerLocked=!!x.o.layerLocked;x.o.visible=x.o.visible!==false;x.o.layerConfidence=background&&x===background?'high':'heuristic';}
  const layers=[...new Set(objects.map(x=>layerOf.get(x.o.id)||1))].sort((a,b)=>a-b).map(index=>({id:'layer-'+index,index,name:names.get(index)||labelFor(index),objectIds:objects.filter(x=>(layerOf.get(x.o.id)||1)===index).map(x=>x.o.id),visible:objects.filter(x=>(layerOf.get(x.o.id)||1)===index).every(x=>x.o.visible!==false),locked:objects.filter(x=>(layerOf.get(x.o.id)||1)===index).some(x=>x.o.layerLocked)}));
- return {objects:ordered,layers,dependencies,order:ordered.map(o=>o.id),summary:{layers:layers.length,objects:objects.length,colors:new Set(objects.map(x=>objectColor(x.o))).size,heuristicRelations:dependencies.filter(x=>x.confidence==='heuristic').length,background:background?.o.id||null}};
+ return {objects:ordered,layers,dependencies,order:ordered.map(o=>o.id),summary:{layers:layers.length,objects:objects.length,colors:new Set(objects.map(x=>objectColor(x.o))).size,heuristicRelations:dependencies.filter(x=>x.confidence==='heuristic').length,background:background?.o.id||null,unbounded:input.length-objects.length}};
 }
 export function setLayerVisibility(objects,layerId,visible){for(const o of objects)if((o.layerId||'layer-1')===layerId)o.visible=!!visible;return objects;}
 export function setLayerLock(objects,layerId,locked){for(const o of objects)if((o.layerId||'layer-1')===layerId)o.layerLocked=!!locked;return objects;}
 export function validateLayerPlan(objects,plan){
  const ids=new Set(objects.map(o=>o.id)),position=new Map(plan.order.map((id,i)=>[id,i])),issues=[];
  for(const edge of plan.dependencies){if(!ids.has(edge.before)||!ids.has(edge.after))continue;if((position.get(edge.before)??Infinity)>(position.get(edge.after)??-1))issues.push({type:'layer-order',before:edge.before,after:edge.after,message:'A dependência de camada está fora de ordem.'});}
- if(plan.summary.objects!==objects.length)issues.push({type:'missing-object',message:'Um ou mais objetos não possuem limites geométricos para análise.'});
+ if((plan.summary.unbounded||0)>0)issues.push({type:'missing-object',message:'Um ou mais objetos não possuem limites geométricos para análise.'});
  return {valid:issues.length===0,issues};
 }
