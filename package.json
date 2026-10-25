@@ -6,7 +6,9 @@
     "build": "node scripts/build-payments.mjs",
     "dev": "node scripts/dev.mjs",
     "build:netlify": "node scripts/build-netlify.mjs",
-    "test:checkout": "node tests/pix.mjs && node tests/netlify.mjs"
+    "test:checkout": "node tests/pix.mjs && node tests/netlify.mjs",
+    "test:layers": "node tests/layers.mjs && node tests/layer-scenarios.mjs",
+    "test:all": "npm run build:netlify && node tests/verify.mjs && node tests/routes.mjs && node tests/digitizer.mjs && node tests/many-regions.mjs && node tests/raster.mjs && node tests/artwork-profile.mjs && npm run test:layers && npm run test:checkout"
   },
   "devDependencies": {
     "esbuild": "0.25.12"

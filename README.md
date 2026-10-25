@@ -122,3 +122,17 @@ Files and QR metadata are bundled into AES-256-GCM encrypted, gzip-compressed be
 Production runtime names: `CHECKOUT_SECRET` (32 random bytes, Base64, secret), `ASAAS_API_KEY` (secret), `ASAAS_PIX_KEY` (secret recommended), `PIX_LIVE_ENABLED=true` only after receiver setup. API calls use the production Asaas domain only. The currently provisioned checkout encryption secret is stored in the native runtime. Asaas credentials and recipient key have NOT been supplied, and live charging remains OFF. The customer UI reports this honestly and never generates a demonstration bank QR. No real transaction has been performed. Native tests mock the provider in isolation, including pending, wrong amount/QR, refund, tampered token, cross-origin rejection, disabled activation and repeat PES/DST downloads. `node tests/pix.mjs` verifies these and boundary prices; existing embroidery regression suites also pass.
 
 Build: `node scripts/build-payments.mjs` generates a standalone `dist/server/index.js`, an embedded allowlist of browser assets, and the deployment manifest. No D1/R2 migrations or new Supabase project are required. `npm run dev` is the supervised local preview; it uses an ephemeral local encryption secret and permanently disabled live payment credentials. Browser QA confirmed a server-quoted 513-point matrix at BRL 1, absent signup fields and disabled paid downloads while receiver setup is incomplete. Successful real-bank authorization, live QR creation, and a real paid download remain unverified until the account is connected.
+
+
+## Camadas, dependências e planejamento de cores (branch de testes)
+
+O módulo `dist/layer-planner.mjs` introduz metadados de camada, grafo de dependências inferidas e ordenação topológica com desempate por cor e proximidade. A importação de arte aplica o plano antes de inserir as regiões; o editor mostra o painel **Camadas e cores**, com renomeação, visibilidade, bloqueio e seleção de objetos. A simulação continua lendo os comandos compilados na sequência usada pelo exportador.
+
+A inferência atual usa limites geométricos e relações de contenção como **heurística**, não como reconhecimento semântico de objetos. Uma imagem raster plana não contém informação suficiente para reconstruir com certeza a geometria escondida atrás de objetos superiores. Por isso, o sistema não inventa partes ocultas e solicita revisão da sequência. O fundo branco continua dependendo da opção de ignorar branco na importação; fundo que deve ser bordado precisa estar representado como região de arte.
+
+Verificações:
+- `npm run test:layers` — dependências, ordem, objetos sem geometria e controles.
+- `npm run test:all` — build, verificações nativas, rotas, digitalização, regiões, raster, camadas e checkout simulado.
+- `tests/layer-scenarios.mjs` contém quatro cenários geométricos sintéticos (rena, Nossa Senhora, desenho vermelho 86 e renda floral). Eles validam a estrutura do algoritmo, mas **não substituem testes com os quatro arquivos de imagem originais**, que ainda precisam ser fornecidos para comparar a segmentação real.
+
+Os números e relações inferidos devem ser conferidos no painel antes de produzir. Não considerar aprovação de software como certificação de bordado físico.

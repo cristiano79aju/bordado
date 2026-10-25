@@ -1,0 +1,57 @@
+name: BordAI isolated validation
+
+on:
+  push:
+    branches:
+      - testes-producao-isolados
+  pull_request:
+    branches:
+      - atelier-premium
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout test branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify machine-file encoders
+        run: node tests/verify.mjs
+
+      - name: Verify route optimization
+        run: node tests/routes.mjs
+
+      - name: Verify digitization pipeline
+        run: node tests/digitizer.mjs
+
+      - name: Verify large artworks
+        run: node tests/many-regions.mjs
+
+      - name: Verify raster preparation
+        run: node tests/raster.mjs
+
+      - name: Verify adaptive artwork profile
+        run: node tests/artwork-profile.mjs
+
+      - name: Verify layer planner and dependency order
+        run: npm run test:layers
+
+      - name: Build Netlify application
+        run: npm run build:netlify
+
+      - name: Verify checkout and Netlify integration
+        run: npm run test:checkout
