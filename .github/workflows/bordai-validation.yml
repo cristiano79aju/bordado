@@ -47,6 +47,9 @@ jobs:
       - name: Verify adaptive artwork profile
         run: node tests/artwork-profile.mjs
 
+      - name: Verify layer planner and dependency order
+        run: node tests/layers.mjs
+
       - name: Build Netlify application
         run: npm run build:netlify
 
