@@ -36,7 +36,7 @@ export function planLayers(input){
    if(candidate===child||area(candidate.b)<=ca*1.28)continue;
    const inter=overlap(child.b,candidate.b),ratio=inter/ca,c=center(child.b);
    const inside=c.x>=candidate.b.minX&&c.x<=candidate.b.maxX&&c.y>=candidate.b.minY&&c.y<=candidate.b.maxY;
-   if(inside&&ratio>=.88&&ratio>best){best=ratio;parent=candidate;}
+   if(inside&&ratio>=.88&&(!parent||area(candidate.b)<area(parent.b))){best=ratio;parent=candidate;}
   }
   if(parent&&(!background||parent!==background)){
    const next=Math.min(100,Math.max(2,(layerOf.get(parent.o.id)||1)+1));
