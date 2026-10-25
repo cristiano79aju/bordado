@@ -11,6 +11,7 @@ assert(plan.summary.layers>=2);
 assert(plan.order.indexOf('bg')<plan.order.indexOf('leaf'));
 assert(plan.order.indexOf('leaf')<plan.order.indexOf('flower'));
 assert.deepEqual(validateLayerPlan(source,plan).issues,[]);
+assert(source.every(o=>o.layerMeta&&o.colorGroupId&&o.entryPoint&&o.exitPoint&&Number.isInteger(o.executionOrder)));
 assert.equal(new Set(plan.order).size,source.length);
 const flowerLayer=flower.layerId;
 setLayerVisibility(source,flowerLayer,false);assert.equal(flower.visible,false);
